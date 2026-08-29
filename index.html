@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Support Desk — Partner-Client Chat</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 0; padding: 20px; background: #f7f7f8; color: #1f2937; }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    button { cursor: pointer; padding: 6px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; font-size: 13px; }
+    button:hover { background: #f3f4f6; }
+    button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+    button.primary:hover { background: #1d4ed8; }
+    button.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+    button.danger:hover { background: #b91c1c; }
+    input { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+    .banner { background: #fef3c7; border: 1px solid #fcd34d; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+    .layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
+    .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .panel-head { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; display: flex; gap: 8px; align-items: center; }
+    .tabs { display: flex; gap: 4px; }
+    .tab { padding: 5px 10px; border-radius: 6px; font-size: 13px; border: 1px solid transparent; background: none; }
+    .tab.active { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; font-weight: 600; }
+    .list { max-height: 62vh; overflow-y: auto; }
+    .row { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; gap: 8px; align-items: flex-start; }
+    .row:hover { background: #f9fafb; }
+    .row.active { background: #eff6ff; }
+    .row.inert { cursor: default; color: #9ca3af; }
+    .row.inert:hover { background: none; }
+    .row-main { flex: 1; min-width: 0; }
+    .row-name { font-weight: 600; font-size: 13px; }
+    .row-sub { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge { background: #dc2626; color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+    .pill { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: #f3f4f6; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+    .messages { height: 55vh; overflow-y: auto; padding: 14px; background: #fafafa; }
+    .msg { margin-bottom: 12px; max-width: 78%; }
+    .msg .bubble { padding: 8px 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+    .msg .meta { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+    .msg.CLIENT { margin-right: auto; }
+    .msg.CLIENT .bubble { background: #fff; border: 1px solid #e5e7eb; }
+    .msg.PARTNER, .msg.SUPPORT, .msg.SYSTEM { margin-left: auto; text-align: right; }
+    .msg.PARTNER .bubble { background: #dcfce7; border: 1px solid #bbf7d0; }
+    .msg.SUPPORT .bubble { background: #dbeafe; border: 1px solid #bfdbfe; }
+    .msg.SYSTEM .bubble { background: #f3f4f6; border: 1px solid #e5e7eb; color: #6b7280; }
+    .composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e5e7eb; }
+    .composer input { flex: 1; }
+    .empty { padding: 28px 14px; text-align: center; color: #9ca3af; font-size: 13px; }
+    .status { font-size: 12px; color: #6b7280; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; margin-right: 5px; }
+    .dot.on { background: #16a34a; }
+    .group-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer;
+                  background: #fafafa; border-bottom: 1px solid #eef0f2; user-select: none; }
+    .group-head:hover { background: #f3f4f6; }
+    .group-head .chev { width: 12px; color: #9ca3af; font-size: 10px; transition: transform .12s; }
+    .group-head.open .chev { transform: rotate(90deg); }
+    .group-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 0;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .group-count { font-size: 11px; color: #9ca3af; }
+    .group-head.unassigned { background: #fffbeb; }
+    .group-head.unassigned:hover { background: #fef3c7; }
+    .child { padding-left: 30px; }
+    .child .row-name { font-weight: 500; }
+  </style>
+</head>
+<body>
+  <h1>Support Desk — Partner-Client Chat</h1>
+  <!--
+  <div class="banner">
+    Serve this page from an origin listed in <code>CORS_ORIGINS</code> (e.g.
+    <code>http://localhost:5000</code>). Opening it as <code>file://</code> sends
+    <code>Origin: null</code> and every API call will fail CORS.
+    Sign in with a phone listed in <code>SUPPORT_PHONES</code> or <code>ADMIN_PHONES</code>.
+  </div>
+-->
+  <div id="authSection" class="panel" style="padding:14px; max-width:420px;">
+    <div style="margin-bottom:10px;">
+      <input id="phone" placeholder="Support phone"  />
+      <button onclick="requestOtp()">Request OTP</button>
+    </div>
+    <div>
+      <input id="otp" placeholder="OTP" />
+      <button class="primary" onclick="verifyOtp()">Sign in</button>
+    </div>
+    <div id="authError" style="color:#dc2626; font-size:12px; margin-top:10px;"></div>
+  </div>
+
+  <div id="mainSection" style="display:none;">
+    <p class="status" style="margin-top:0;">
+      Signed in as <strong id="supportPhone"></strong>
+      &nbsp;·&nbsp; <span id="connState"><span class="dot"></span>not connected</span>
+      &nbsp;·&nbsp; <button onclick="logout()">Sign out</button>
+    </p>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="tabs">
+            <button class="tab active" id="tabChats" onclick="switchTab('chats')">Conversations</button>
+            <button class="tab" id="tabClients" onclick="switchTab('clients')">All clients</button>
+          </div>
+          <div style="margin-left:auto;"><button onclick="reloadActiveTab()">Refresh</button></div>
+        </div>
+        <div id="clientSearchBar" class="panel-head" style="display:none;">
+          <input id="clientSearch" placeholder="Search name or phone" style="flex:1;"
+                 onkeydown="if(event.key==='Enter') loadClients()" />
+          <button onclick="loadClients()">Search</button>
+        </div>
+        <div id="list" class="list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <strong id="chatTitle" style="font-size:14px;">No conversation selected</strong>
+          <span id="chatSub" class="status" style="margin-left:auto;"></span>
+          <button id="closeChatBtn" class="danger" onclick="closeChat()"
+                  style="display:none;"
+                  title="Close this conversation">&#10005; Close</button>
+        </div>
+        <div id="messages" class="messages">
+          <div class="empty">Pick a conversation on the left.</div>
+        </div>
+        <div class="composer">
+          <input id="replyBody" placeholder="Type a reply as SUPPORT"
+                 onkeydown="if(event.key==='Enter') sendReply()" disabled />
+          <button class="primary" id="sendBtn" onclick="sendReply()" disabled>Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    const API = 'http://localhost:5656/api/v1';
+    const SOCKET_URL = 'http://localhost:5656/chat';
+
+    let token = localStorage.getItem('supportToken') || '';
+    let socket = null;
+    let currentConversationId = null;
+    let currentTab = 'chats';
+    let conversations = [];
+    let clients = [];
+    let clientsLoaded = false;
+    // Partner ids (or UNASSIGNED) the operator has opened. Kept outside the
+    // render so the periodic refresh never collapses the tree under them.
+    const expandedGroups = new Set();
+    const UNASSIGNED = '__unassigned__';
+    let pollTimer = null;
+
+    // --- API helpers -----------
+
+    async function api(path, options = {}) {
+      const res = await fetch(API + path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: 'Bearer ' + token } : {}),
+          ...(options.headers || {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error?.message || json?.message || ('HTTP ' + res.status));
+      }
+      return json;
+    }
+
+    // --- Auth ---------
+
+    async function requestOtp() {
+      const phone = document.getElementById('phone').value.trim();
+      try {
+        await api('/auth/send-otp', { method: 'POST', body: JSON.stringify({ phone }) });
+        setAuthError('OTP sent.');
+      } catch (e) {
+        setAuthError(e.message);
+      }
+    }
+
+    async function verifyOtp() {
+      const phone = document.getElementById('phone').value.trim();
+      const otp = document.getElementById('otp').value.trim();
+      try {
+        const result = await api('/auth/verify-otp', {
+          method: 'POST',
+          body: JSON.stringify({ phone, otp }),
+        });
+        if (!result.data?.sessionToken) throw new Error('No session token returned');
+        token = result.data.sessionToken;
+        localStorage.setItem('supportToken', token);
+        localStorage.setItem('supportPhone', phone);
+        showMain();
+      } catch (e) {
+        setAuthError(e.message);
+      }
+    }
+
+    function setAuthError(msg) {
+      document.getElementById('authError').textContent = msg;
+    }
+
+    function logout() {
+      localStorage.removeItem('supportToken');
+      localStorage.removeItem('supportPhone');
+      if (socket) socket.disconnect();
+      if (pollTimer) clearInterval(pollTimer);
+      location.reload();
+    }
+
+    function showMain() {
+      document.getElementById('authSection').style.display = 'none';
+      document.getElementById('mainSection').style.display = 'block';
+      document.getElementById('supportPhone').textContent =
+        localStorage.getItem('supportPhone') || '';
+      loadConversations();
+      // Keep unread badges fresh while the operator is reading another thread.
+      pollTimer = setInterval(() => {
+        if (currentTab === 'chats') loadConversations({ quiet: true });
+        else loadClients({ quiet: true });
+      }, 15000);
+    }
+
+    // --- Lists ----------
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('tabChats').classList.toggle('active', tab === 'chats');
+      document.getElementById('tabClients').classList.toggle('active', tab === 'clients');
+      document.getElementById('clientSearchBar').style.display =
+        tab === 'clients' ? 'flex' : 'none';
+      reloadActiveTab();
+    }
+
+    function reloadActiveTab() {
+      if (currentTab === 'chats') loadConversations();
+      else loadClients();
+    }
+
+    function renderActiveTab() {
+      if (currentTab === 'chats') renderConversations();
+      else if (clientsLoaded) renderClients();
+    }
+
+    /** Unread counts live on the conversation payload, keyed by conversation id. */
+    function unreadByConversation() {
+      return new Map(conversations.map((c) => [c.id, c.unreadFromClient || 0]));
+    }
+
+    async function loadConversations(opts = {}) {
+      try {
+        const result = await api('/partner-client-chat/support/conversations');
+        conversations = result.data || [];
+        renderActiveTab();
+      } catch (e) {
+        if (!opts.quiet) renderError(e.message);
+      }
+    }
+
+    function renderConversations() {
+      const list = document.getElementById('list');
+      if (conversations.length === 0) {
+        list.innerHTML = '<div class="empty">No conversations yet.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      conversations.forEach((c) => {
+        const row = document.createElement('div');
+        row.className = 'row' + (c.id === currentConversationId ? ' active' : '');
+        row.onclick = () => openChat(c.id, describeClient(c.client), c);
+
+        const name = describeClient(c.client);
+        const preview = c.lastMessage
+          ? '[' + c.lastMessage.senderRole + '] ' + c.lastMessage.body
+          : 'No messages yet';
+        const when = c.lastMessage ? formatTime(c.lastMessage.createdAt) : '';
+
+        row.innerHTML =
+          '<div class="row-main">' +
+            '<div class="row-name">' + escapeHtml(name) + '</div>' +
+            '<div class="row-sub">' + escapeHtml(preview) + '</div>' +
+            '<div class="row-sub" style="margin-top:2px;">' +
+              '<span class="pill">' + c.status + '</span>' +
+              (describePartner(c.partner)
+                ? ' <span class="pill" title="Assigned partner">' +
+                  escapeHtml(describePartner(c.partner)) + '</span>'
+                : ' <span class="pill">no partner</span>') +
+              (when ? ' <span style="color:#9ca3af;">' + when + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+          (c.unreadFromClient > 0
+            ? '<span class="badge">' + c.unreadFromClient + '</span>'
+            : '');
+        list.appendChild(row);
+      });
+    }
+
+    async function loadClients(opts = {}) {
+      const search = document.getElementById('clientSearch').value.trim();
+      try {
+        const qs = search ? '?search=' + encodeURIComponent(search) : '';
+        // Unread counts come from the conversation list, so refresh both in one
+        // go — otherwise these badges would drift from the Conversations tab.
+        const [result] = await Promise.all([
+          api('/partner-client-chat/support/clients' + qs),
+          loadConversations({ quiet: true }),
+        ]);
+        clients = result.data || [];
+        clientsLoaded = true;
+        if (currentTab === 'clients') renderClients();
+      } catch (e) {
+        if (!opts.quiet) renderError(e.message);
+      }
+    }
+
+    /**
+     * Clients grouped under their assigned partner, unassigned ones first.
+     *
+     * Unassigned clients are the support desk's own responsibility (nobody else
+     * sees those threads), so they lead rather than sit at the bottom.
+     */
+    function groupClients() {
+      const groups = new Map();
+      clients.forEach((client) => {
+        const key = client.partner ? client.partner.partnerId : UNASSIGNED;
+        if (!groups.has(key)) {
+          groups.set(key, { key: key, partner: client.partner || null, clients: [] });
+        }
+        groups.get(key).clients.push(client);
+      });
+
+      const ordered = [];
+      if (groups.has(UNASSIGNED)) ordered.push(groups.get(UNASSIGNED));
+      Array.from(groups.values())
+        .filter((g) => g.key !== UNASSIGNED)
+        // Stable alphabetical rather than by unread: sorting on unread would
+        // make rows jump around under the operator as messages arrive.
+        .sort((a, b) =>
+          String(describePartner(a.partner) || '').localeCompare(
+            String(describePartner(b.partner) || ''),
+          ),
+        )
+        .forEach((g) => ordered.push(g));
+      return ordered;
+    }
+
+    function toggleGroup(key) {
+      if (expandedGroups.has(key)) expandedGroups.delete(key);
+      else expandedGroups.add(key);
+      renderClients();
+    }
+
+    function renderClients() {
+      const list = document.getElementById('list');
+      if (clients.length === 0) {
+        list.innerHTML = '<div class="empty">No clients found.</div>';
+        return;
+      }
+
+      const unreadMap = unreadByConversation();
+      const searching =
+        document.getElementById('clientSearch').value.trim().length > 0;
+
+      list.innerHTML = '';
+      groupClients().forEach((group) => {
+        const unassigned = group.key === UNASSIGNED;
+        const label = unassigned
+          ? 'Unassigned — handled by support'
+          : describePartner(group.partner);
+
+        const groupUnread = group.clients.reduce(
+          (sum, c) => sum + (unreadMap.get(c.conversationId) || 0),
+          0,
+        );
+        const holdsOpenChat = group.clients.some(
+          (c) => c.conversationId && c.conversationId === currentConversationId,
+        );
+        // Auto-open while searching (the operator is hunting for someone) and
+        // for whichever group holds the conversation on screen.
+        const open =
+          expandedGroups.has(group.key) || searching || holdsOpenChat;
+
+        const head = document.createElement('div');
+        head.className =
+          'group-head' + (open ? ' open' : '') + (unassigned ? ' unassigned' : '');
+        head.innerHTML =
+          '<span class="chev">&#9654;</span>' +
+          '<span class="group-name">' + escapeHtml(label) + '</span>' +
+          '<span class="group-count">' + group.clients.length + '</span>' +
+          (groupUnread > 0 ? '<span class="badge">' + groupUnread + '</span>' : '');
+        head.onclick = () => toggleGroup(group.key);
+        list.appendChild(head);
+
+        if (!open) return;
+        group.clients.forEach((client) => {
+          list.appendChild(buildClientRow(client, unreadMap));
+        });
+      });
+    }
+
+    function buildClientRow(client, unreadMap) {
+      const row = document.createElement('div');
+      const label = describeClient(client);
+      const unread = unreadMap.get(client.conversationId) || 0;
+      row.className =
+        'row child' +
+        (client.conversationId && client.conversationId === currentConversationId
+          ? ' active'
+          : '');
+
+      row.innerHTML =
+        '<div class="row-main">' +
+          '<div class="row-name">' + escapeHtml(label) + '</div>' +
+          '<div class="row-sub">' +
+            (client.conversationId
+              ? (unread > 0
+                  ? unread + ' new message' + (unread === 1 ? '' : 's')
+                  : 'Open chat')
+              : 'No chat yet') +
+          '</div>' +
+        '</div>' +
+        (unread > 0 ? '<span class="badge">' + unread + '</span>' : '');
+
+      if (client.conversationId) {
+        row.onclick = () => openChat(client.conversationId, label);
+      } else {
+        const start = document.createElement('button');
+        start.textContent = 'Start chat';
+        start.onclick = (ev) => {
+          ev.stopPropagation();
+          startChat(client.userId, label);
+        };
+        row.appendChild(start);
+      }
+      return row;
+    }
+
+    async function startChat(clientUserId, label) {
+      try {
+        const result = await api(
+          '/partner-client-chat/support/clients/' + clientUserId + '/conversation',
+          { method: 'POST' },
+        );
+        const conversationId = result.data?.id;
+        if (!conversationId) throw new Error('No conversation returned');
+        await loadClients({ quiet: true });
+        openChat(conversationId, label);
+      } catch (e) {
+        renderError(e.message);
+      }
+    }
+
+    function renderError(msg) {
+      document.getElementById('list').innerHTML =
+        '<div class="empty" style="color:#dc2626;">' + escapeHtml(msg) + '</div>';
+    }
+
+    // --- Chat -----
+
+    function openChat(conversationId, label, conversation) {
+      currentConversationId = conversationId;
+      document.getElementById('chatTitle').textContent = label || 'Conversation';
+      const conv = conversation ||
+        conversations.find((c) => c.id === conversationId);
+      const partnerLabel = describePartner(conv && conv.partner);
+      document.getElementById('chatSub').textContent =
+        partnerLabel ? 'Partner: ' + partnerLabel : 'No partner';
+      document.getElementById('closeChatBtn').style.display = '';
+      document.getElementById('messages').innerHTML = '';
+      document.getElementById('replyBody').disabled = false;
+      document.getElementById('sendBtn').disabled = false;
+      renderActiveTab();
+
+      // One room at a time: reconnecting on switch keeps the server from
+      // auto-marking messages read in threads the operator is not reading.
+      if (socket) socket.disconnect();
+      socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
+
+      socket.on('connect', () => {
+        setConnState(true);
+        socket.emit('join_conversation', { conversationId });
+      });
+      socket.on('disconnect', () => setConnState(false));
+      socket.on('connect_error', (err) => {
+        setConnState(false);
+        log('SYSTEM', 'Connection error: ' + (err?.message || err), null);
+      });
+
+      socket.on('conversation_history', (conv) => {
+        (conv.messages || []).forEach((m) =>
+          log(m.senderRole, m.body, m.createdAt, m.readAt),
+        );
+        // Joining clears unread server-side; reflect that in the list.
+        loadConversations({ quiet: true });
+      });
+
+      socket.on('new_message', (m) => {
+        if (m.conversationId !== currentConversationId) return;
+        log(m.senderRole, m.body, m.createdAt, m.readAt);
+        loadConversations({ quiet: true });
+      });
+
+      socket.on('message_read', () => loadConversations({ quiet: true }));
+      socket.on('error', (err) =>
+        log('SYSTEM', 'Error: ' + (err?.message || JSON.stringify(err)), null),
+      );
+    }
+
+    /** Closes the open thread and returns the pane to its empty state. */
+    function closeChat() {
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+      currentConversationId = null;
+      setConnState(false);
+
+      document.getElementById('chatTitle').textContent = 'No conversation selected';
+      document.getElementById('chatSub').textContent = '';
+      document.getElementById('closeChatBtn').style.display = 'none';
+      document.getElementById('messages').innerHTML =
+        '<div class="empty">Pick a conversation on the left.</div>';
+
+      const input = document.getElementById('replyBody');
+      input.value = '';
+      input.disabled = true;
+      document.getElementById('sendBtn').disabled = true;
+
+      // Drop the highlight from whichever row was active.
+      renderActiveTab();
+    }
+
+    function sendReply() {
+      const input = document.getElementById('replyBody');
+      const body = input.value.trim();
+      if (!body || !socket || !currentConversationId) return;
+      socket.emit('send_message', { conversationId: currentConversationId, body });
+      input.value = '';
+    }
+
+    function setConnState(on) {
+      document.getElementById('connState').innerHTML =
+        '<span class="dot' + (on ? ' on' : '') + '"></span>' +
+        (on ? 'connected' : 'not connected');
+    }
+
+    function log(role, body, createdAt, readAt) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg ' + role;
+      const meta =
+        (createdAt ? formatTime(createdAt) : '') +
+        (readAt ? ' · read' : '');
+      wrap.innerHTML =
+        '<div class="bubble">' + escapeHtml(body) + '</div>' +
+        '<div class="meta">' + role + (meta ? ' · ' + meta : '') + '</div>';
+      const box = document.getElementById('messages');
+      box.appendChild(wrap);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    // --- Utils ---
+
+    /** Partner label for a row — falls back to a clear "unassigned" marker. */
+    function describePartner(partner) {
+      if (!partner) return null;
+      return partner.name || partner.phone || 'Partner';
+    }
+
+    function describeClient(client) {
+      if (!client) return 'Unknown client';
+      return client.name ? client.name + ' (' + client.phone + ')' : client.phone;
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    if (token) showMain();
+  </script>
+</body>
+</html>
