@@ -131,7 +131,7 @@
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script>
     const API = 'https://staging.multiplyy.co.in/api/v1';
-    const SOCKET_URL = 'https://staging.multiplyy.co.in/chat';
+    const SOCKET_URL = 'https://staging.multiplyy.co.in/api/v1/chat';
 
     let token = localStorage.getItem('supportToken') || '';
     let socket = null;
@@ -139,6 +139,13 @@
     let currentTab = 'chats';
     let conversations = [];
     let clients = [];
+    // Ids already drawn in the chat pane. Both the live connection and the
+    // HTTP check add messages, so this stops the same one appearing twice.
+    let shownMessageIds = new Set();
+    let chatPollTimer = null;
+    // True only after the server confirms we joined the chat. A connected
+    // socket that failed to join delivers nothing, so it does not count.
+    let socketLive = false;
     let clientsLoaded = false;
     // Partner ids (or UNASSIGNED) the operator has opened. Kept outside the
     // render so the periodic refresh never collapses the tree under them.
@@ -203,6 +210,7 @@
       localStorage.removeItem('supportPhone');
       if (socket) socket.disconnect();
       if (pollTimer) clearInterval(pollTimer);
+      stopChatPolling();
       location.reload();
     }
 
@@ -457,6 +465,9 @@
 
     function openChat(conversationId, label, conversation) {
       currentConversationId = conversationId;
+      shownMessageIds = new Set();
+      socketLive = false;
+
       document.getElementById('chatTitle').textContent = label || 'Conversation';
       const conv = conversation ||
         conversations.find((c) => c.id === conversationId);
@@ -469,47 +480,122 @@
       document.getElementById('sendBtn').disabled = false;
       renderActiveTab();
 
-      // One room at a time: reconnecting on switch keeps the server from
-      // auto-marking messages read in threads the operator is not reading.
+      // Load the history over HTTP straight away. This always works, even
+      // where the server does not offer a live connection.
+      loadThread();
+
+      // Then try to go live. If it connects we switch off the HTTP checking;
+      // if it fails we simply keep checking. Either way the chat works.
+      connectSocket(conversationId);
+      startChatPolling();
+    }
+
+    /** Reads the whole chat over HTTP and draws anything new. */
+    async function loadThread() {
+      const conversationId = currentConversationId;
+      if (!conversationId) return;
+      try {
+        const result = await api('/partner-client-chat/conversations/' + conversationId);
+        const messages = (result.data && result.data.messages) || [];
+        messages.forEach(appendMessage);
+        await markThreadRead(messages);
+        loadConversations({ quiet: true });
+      } catch (e) {
+        // A failed check is not a chat failure — the next one retries.
+      }
+    }
+
+    /**
+     * Tells the server we have read the other side's messages.
+     *
+     * Joining over the live connection does this by itself, so this is only
+     * needed on the HTTP path. Skipped when there is nothing unread.
+     */
+    async function markThreadRead(messages) {
+      const conversationId = currentConversationId;
+      if (!conversationId) return;
+      const unread = messages.some((m) => m.senderRole !== 'SUPPORT' && !m.readAt);
+      if (!unread) return;
+      try {
+        await api('/partner-client-chat/conversations/' + conversationId + '/read',
+          { method: 'PATCH' });
+      } catch (e) { /* not important enough to surface */ }
+    }
+
+    /** Draws a message once. Ignores ones already on screen. */
+    function appendMessage(m) {
+      if (!m || !m.id || shownMessageIds.has(m.id)) return;
+      shownMessageIds.add(m.id);
+      log(m.senderRole, m.body, m.createdAt, m.readAt);
+    }
+
+    function startChatPolling() {
+      if (chatPollTimer) return;
+      chatPollTimer = setInterval(() => {
+        if (!socketLive) loadThread();
+      }, 4000);
+    }
+
+    function stopChatPolling() {
+      if (chatPollTimer) clearInterval(chatPollTimer);
+      chatPollTimer = null;
+    }
+
+    function connectSocket(conversationId) {
+      // One chat at a time: reconnecting on switch keeps the server from
+      // marking messages read in threads nobody is reading.
       if (socket) socket.disconnect();
       socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
 
       socket.on('connect', () => {
-        setConnState(true);
         socket.emit('join_conversation', { conversationId });
       });
-      socket.on('disconnect', () => setConnState(false));
-      socket.on('connect_error', (err) => {
+
+      socket.on('joined', () => {
+        socketLive = true;
+        setConnState(true);
+      });
+
+      socket.on('disconnect', () => {
+        socketLive = false;
         setConnState(false);
-        log('SYSTEM', 'Connection error: ' + (err?.message || err), null);
+      });
+
+      // No live connection available. Not an error the operator needs to see —
+      // the HTTP checking below keeps the chat working.
+      socket.on('connect_error', () => {
+        socketLive = false;
+        setConnState(false);
       });
 
       socket.on('conversation_history', (conv) => {
-        (conv.messages || []).forEach((m) =>
-          log(m.senderRole, m.body, m.createdAt, m.readAt),
-        );
-        // Joining clears unread server-side; reflect that in the list.
+        (conv.messages || []).forEach(appendMessage);
         loadConversations({ quiet: true });
       });
 
       socket.on('new_message', (m) => {
         if (m.conversationId !== currentConversationId) return;
-        log(m.senderRole, m.body, m.createdAt, m.readAt);
+        appendMessage(m);
         loadConversations({ quiet: true });
       });
 
       socket.on('message_read', () => loadConversations({ quiet: true }));
-      socket.on('error', (err) =>
-        log('SYSTEM', 'Error: ' + (err?.message || JSON.stringify(err)), null),
-      );
+
+      socket.on('error', (err) => {
+        socketLive = false;
+        log('SYSTEM', 'Error: ' + (err && err.message ? err.message : JSON.stringify(err)), null);
+      });
     }
 
     /** Closes the open thread and returns the pane to its empty state. */
     function closeChat() {
+      stopChatPolling();
       if (socket) {
         socket.disconnect();
         socket = null;
       }
+      socketLive = false;
+      shownMessageIds = new Set();
       currentConversationId = null;
       setConnState(false);
 
@@ -528,12 +614,34 @@
       renderActiveTab();
     }
 
-    function sendReply() {
+    /** Sends over the live connection when it is working, over HTTP when not. */
+    async function sendReply() {
       const input = document.getElementById('replyBody');
       const body = input.value.trim();
-      if (!body || !socket || !currentConversationId) return;
-      socket.emit('send_message', { conversationId: currentConversationId, body });
+      if (!body || !currentConversationId) return;
       input.value = '';
+
+      if (socketLive && socket) {
+        socket.emit('send_message', { conversationId: currentConversationId, body });
+        return;
+      }
+
+      const sendBtn = document.getElementById('sendBtn');
+      sendBtn.disabled = true;
+      try {
+        const result = await api(
+          '/partner-client-chat/conversations/' + currentConversationId + '/messages',
+          { method: 'POST', body: JSON.stringify({ body: body }) },
+        );
+        // Nothing echoes it back to us without a live connection, so draw it.
+        appendMessage(result.data);
+        loadConversations({ quiet: true });
+      } catch (e) {
+        log('SYSTEM', 'Could not send: ' + e.message, null);
+        input.value = body;
+      } finally {
+        sendBtn.disabled = false;
+      }
     }
 
     function setConnState(on) {
