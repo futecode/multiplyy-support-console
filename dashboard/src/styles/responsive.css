@@ -1,0 +1,212 @@
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 1280px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Icon rail */
+@media (max-width: 1100px) {
+  :root {
+    --sidebar-w: 72px;
+  }
+  .brand {
+    justify-content: center;
+    padding: 16px 0;
+  }
+  .brand-text,
+  .nav-label,
+  .me-text {
+    display: none;
+  }
+  .nav {
+    padding: 8px 12px;
+    align-items: center;
+  }
+  .nav-link {
+    width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .nav-link .unread {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 10px;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  .me-card {
+    justify-content: center;
+    margin: auto 0 12px;
+    padding: 8px 0;
+    border: 0;
+    background: transparent;
+  }
+  .detail-grid,
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --content-pad: var(--space-4);
+  }
+  .chat-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chat-layout.has-active .chat-list,
+  .chat-layout:not(.has-active) .chat-thread {
+    display: none;
+  }
+  .thread-back {
+    display: inline-flex;
+  }
+  .thread-close {
+    display: none;
+  }
+  .login-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .login-hero {
+    padding: 28px 24px 32px;
+    gap: 24px;
+  }
+  .login-foot {
+    display: none;
+  }
+  .login-headline {
+    font-size: 28px;
+  }
+  .login-subline {
+    margin-top: 14px;
+    font-size: 15px;
+  }
+  .login-main {
+    place-items: start center;
+    padding: 24px 16px 40px;
+  }
+}
+
+/* Compact top bar */
+@media (max-width: 760px) {
+  :root {
+    --topbar-h: 56px;
+  }
+  .shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: var(--topbar-h);
+    flex-direction: row;
+    align-items: center;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    padding: 0 8px 0 12px;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+  }
+  .nav {
+    flex-direction: row;
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 2px;
+    padding: 0 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-link {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+  .nav-link.active::before {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: 2px;
+    width: auto;
+    height: 3px;
+    border-radius: 3px;
+  }
+  .me-card {
+    display: none;
+  }
+  .header {
+    gap: 8px;
+  }
+  .page-title {
+    font-size: 16px;
+  }
+  .page-sub,
+  .pill-live .pill-text {
+    display: none;
+  }
+  .header-right {
+    gap: 6px;
+  }
+  .pill-live {
+    padding: 0 9px;
+  }
+  .cards {
+    gap: 12px;
+  }
+  .count-card {
+    padding: 14px;
+  }
+  .msg {
+    max-width: 88%;
+  }
+  .event-head time {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pill-unread [data-testid='header-unread'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .search {
+    min-width: 0;
+  }
+  .toolbar select {
+    flex: 1;
+    min-width: 0;
+  }
+  .login-card {
+    padding: 24px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .count-card:hover {
+    transform: none;
+  }
+}

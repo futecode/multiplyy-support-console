@@ -13,7 +13,7 @@
     button.primary:hover { background: #1d4ed8; }
     button.danger { background: #dc2626; color: #fff; border-color: #dc2626; }
     button.danger:hover { background: #b91c1c; }
-    input { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+    input, select, textarea { font-family: inherit; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
     .banner { background: #fef3c7; border: 1px solid #fcd34d; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
     .layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
     .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
@@ -60,6 +60,19 @@
     .group-head.unassigned:hover { background: #fef3c7; }
     .child { padding-left: 30px; }
     .child .row-name { font-weight: 500; }
+    .pill.st-OPEN { background: #fef3c7; color: #92400e; }
+    .pill.st-IN_PROGRESS { background: #dbeafe; color: #1d4ed8; }
+    .pill.st-RESOLVED { background: #dcfce7; color: #166534; }
+    .detail { padding: 14px; max-height: 70vh; overflow-y: auto; font-size: 13px; }
+    .detail p { margin: 0 0 6px; }
+    .detail h4 { margin: 16px 0 6px; font-size: 13px; }
+    .detail textarea, .detail input { width: 100%; margin-bottom: 6px; }
+    .desc { white-space: pre-wrap; word-break: break-word; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; }
+    .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .thumbs img { width: 90px; height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
+    .event { border-left: 2px solid #e5e7eb; padding: 2px 0 8px 10px; }
+    .event .desc { margin-top: 4px; padding: 6px 8px; }
+    .err { color: #dc2626; font-size: 12px; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -97,6 +110,7 @@
           <div class="tabs">
             <button class="tab active" id="tabChats" onclick="switchTab('chats')">Conversations</button>
             <button class="tab" id="tabClients" onclick="switchTab('clients')">All clients</button>
+            <button class="tab" id="tabTickets" onclick="switchTab('tickets')">Tickets</button>
           </div>
           <div style="margin-left:auto;"><button onclick="reloadActiveTab()">Refresh</button></div>
         </div>
@@ -105,10 +119,29 @@
                  onkeydown="if(event.key==='Enter') loadClients()" />
           <button onclick="loadClients()">Search</button>
         </div>
+        <div id="ticketBar" style="display:none;">
+          <div id="ticketFilters" class="panel-head tabs" style="flex-wrap:wrap;"></div>
+          <div class="panel-head">
+            <select id="ticketCategory" onchange="loadTickets({ page: 1 })">
+              <option value="">All categories</option>
+            </select>
+            <input id="ticketSearch" placeholder="MTP-12, name or phone" style="flex:1; min-width:0;"
+                   onkeydown="if(event.key==='Enter') loadTickets({ page: 1 })" />
+          </div>
+        </div>
         <div id="list" class="list"></div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="ticketPanel" style="display:none;">
+        <div class="panel-head">
+          <strong id="ticketTitle" style="font-size:14px;">No ticket selected</strong>
+        </div>
+        <div id="ticketDetail" class="detail">
+          <div class="empty">Pick a ticket on the left.</div>
+        </div>
+      </div>
+
+      <div class="panel" id="chatPanel">
         <div class="panel-head">
           <strong id="chatTitle" style="font-size:14px;">No conversation selected</strong>
           <span id="chatSub" class="status" style="margin-left:auto;"></span>
@@ -132,6 +165,7 @@
   <script>
     const API = 'http://localhost:5656/api/v1';
     const SOCKET_URL = 'http://localhost:5656/chat';
+    const DESK_SOCKET_URL = 'http://localhost:5656/support-desk';
 
     let token = localStorage.getItem('supportToken') || '';
     let socket = null;
@@ -145,6 +179,8 @@
     const expandedGroups = new Set();
     const UNASSIGNED = '__unassigned__';
     let pollTimer = null;
+    // Long-lived socket for live ticket updates (the chat socket reconnects per thread).
+    let deskSocket = null;
 
     // --- API helpers -----------
 
@@ -166,10 +202,14 @@
 
     // --- Auth ---------
 
+    // verify-otp must echo back the requestId that send-otp returned.
+    let otpRequestId = null;
+
     async function requestOtp() {
       const phone = document.getElementById('phone').value.trim();
       try {
-        await api('/auth/send-otp', { method: 'POST', body: JSON.stringify({ phone }) });
+        const result = await api('/auth/send-otp', { method: 'POST', body: JSON.stringify({ phone }) });
+        otpRequestId = result.data?.requestId ?? null;
         setAuthError('OTP sent.');
       } catch (e) {
         setAuthError(e.message);
@@ -179,10 +219,14 @@
     async function verifyOtp() {
       const phone = document.getElementById('phone').value.trim();
       const otp = document.getElementById('otp').value.trim();
+      if (!otpRequestId) {
+        setAuthError('Request an OTP first.');
+        return;
+      }
       try {
         const result = await api('/auth/verify-otp', {
           method: 'POST',
-          body: JSON.stringify({ phone, otp }),
+          body: JSON.stringify({ phone, otp, requestId: otpRequestId }),
         });
         if (!result.data?.sessionToken) throw new Error('No session token returned');
         token = result.data.sessionToken;
@@ -202,6 +246,7 @@
       localStorage.removeItem('supportToken');
       localStorage.removeItem('supportPhone');
       if (socket) socket.disconnect();
+      if (deskSocket) deskSocket.disconnect();
       if (pollTimer) clearInterval(pollTimer);
       location.reload();
     }
@@ -211,12 +256,29 @@
       document.getElementById('mainSection').style.display = 'block';
       document.getElementById('supportPhone').textContent =
         localStorage.getItem('supportPhone') || '';
-      loadConversations();
+      switchTab('tickets');
+      connectDesk();
       // Keep unread badges fresh while the operator is reading another thread.
+      // Tickets arrive live over the desk socket; this is only a safety net.
       pollTimer = setInterval(() => {
         if (currentTab === 'chats') loadConversations({ quiet: true });
-        else loadClients({ quiet: true });
-      }, 15000);
+        else if (currentTab === 'clients') loadClients({ quiet: true });
+        else loadTickets({ quiet: true });
+      }, 60000);
+    }
+
+    // The backend pushes { ticketId, change } to support staff whenever a
+    // ticket is raised or changes; we refetch through the normal API.
+    function connectDesk() {
+      deskSocket = io(DESK_SOCKET_URL, { auth: { token }, transports: ['websocket'] });
+      deskSocket.on('ticket_updated', ({ ticketId }) => {
+        if (currentTab !== 'tickets') return;
+        loadTickets({ quiet: true });
+        // Don't wipe a reply the operator is still typing.
+        const typing = [...document.querySelectorAll('#ticketDetail input, #ticketDetail textarea')]
+          .some((el) => el.value.trim());
+        if (ticketId === currentTicketId && !typing) openTicket(ticketId);
+      });
     }
 
     // --- Lists ----------
@@ -227,16 +289,22 @@
       document.getElementById('tabClients').classList.toggle('active', tab === 'clients');
       document.getElementById('clientSearchBar').style.display =
         tab === 'clients' ? 'flex' : 'none';
+      document.getElementById('tabTickets').classList.toggle('active', tab === 'tickets');
+      document.getElementById('ticketBar').style.display = tab === 'tickets' ? '' : 'none';
+      document.getElementById('ticketPanel').style.display = tab === 'tickets' ? '' : 'none';
+      document.getElementById('chatPanel').style.display = tab === 'tickets' ? 'none' : '';
       reloadActiveTab();
     }
 
     function reloadActiveTab() {
       if (currentTab === 'chats') loadConversations();
-      else loadClients();
+      else if (currentTab === 'clients') loadClients();
+      else loadTickets();
     }
 
     function renderActiveTab() {
       if (currentTab === 'chats') renderConversations();
+      else if (currentTab === 'tickets') renderTickets();
       else if (clientsLoaded) renderClients();
     }
 
@@ -554,6 +622,190 @@
       const box = document.getElementById('messages');
       box.appendChild(wrap);
       box.scrollTop = box.scrollHeight;
+    }
+
+    // --- Tickets -----
+
+    const TICKET_STATUS = { OPEN: 'Open', IN_PROGRESS: 'In progress', RESOLVED: 'Resolved' };
+    const TICKET_EVENT = { CREATED: 'Ticket raised', NOTE: 'Update', REOPENED: 'Reopened by partner' };
+    const ticketQuery = { status: '', page: 1 };
+    let ticketPage = null;
+    let currentTicketId = null;
+    let ticketCategoriesLoaded = false;
+
+    function statusBadge(s) {
+      return '<span class="pill st-' + escapeHtml(s) + '">' + escapeHtml(TICKET_STATUS[s] || s) + '</span>';
+    }
+
+    function ticketPartner(p) {
+      if (!p) return 'Unknown partner';
+      return [p.name, p.businessName].filter(Boolean).join(' / ') + (p.phone ? ' · ' + p.phone : '');
+    }
+
+    function ticketClient(c) {
+      if (!c) return 'Partner (self)';
+      return (c.name || c.phone || 'Client') + (c.clientCode ? ' (' + c.clientCode + ')' : '');
+    }
+
+    async function loadTicketCategories() {
+      if (ticketCategoriesLoaded) return;
+      ticketCategoriesLoaded = true;
+      try {
+        const result = await api('/support/tickets/categories');
+        const select = document.getElementById('ticketCategory');
+        (result.data || []).forEach((c) => select.add(new Option(c.label, c.code)));
+      } catch (e) {
+        ticketCategoriesLoaded = false;
+      }
+    }
+
+    async function loadTickets(opts = {}) {
+      if (opts.status !== undefined) { ticketQuery.status = opts.status; ticketQuery.page = 1; }
+      if (opts.page) ticketQuery.page = opts.page;
+      loadTicketCategories();
+      const params = new URLSearchParams({ page: ticketQuery.page });
+      const category = document.getElementById('ticketCategory').value;
+      const q = document.getElementById('ticketSearch').value.trim();
+      if (ticketQuery.status) params.set('status', ticketQuery.status);
+      if (category) params.set('category', category);
+      if (q) params.set('q', q);
+      try {
+        const result = await api('/support/tickets?' + params);
+        ticketPage = result.data;
+        if (currentTab === 'tickets') renderTickets();
+      } catch (e) {
+        if (!opts.quiet) renderError(e.message);
+      }
+    }
+
+    function renderTickets() {
+      if (!ticketPage) return;
+      const counts = ticketPage.counts || {};
+      document.getElementById('ticketFilters').innerHTML = [
+        ['', 'All', counts.all], ['OPEN', 'Open', counts.open],
+        ['IN_PROGRESS', 'In progress', counts.inProgress], ['RESOLVED', 'Resolved', counts.resolved],
+      ].map(([s, label, n]) =>
+        '<button class="tab' + (ticketQuery.status === s ? ' active' : '') +
+        '" onclick="loadTickets({ status: \'' + s + '\' })">' + label + ' (' + (n || 0) + ')</button>',
+      ).join('');
+
+      const list = document.getElementById('list');
+      const items = ticketPage.items || [];
+      list.innerHTML = items.length ? '' : '<div class="empty">No tickets found.</div>';
+      items.forEach((t) => {
+        const row = document.createElement('div');
+        row.className = 'row' + (t.id === currentTicketId ? ' active' : '');
+        row.onclick = () => openTicket(t.id);
+        row.innerHTML =
+          '<div class="row-main">' +
+            '<div class="row-name">' + escapeHtml(t.ticketNo) + ' · ' + escapeHtml(t.categoryLabel || t.category) + '</div>' +
+            '<div class="row-sub">' + escapeHtml(ticketPartner(t.partner)) + '</div>' +
+            '<div class="row-sub">' + escapeHtml(ticketClient(t.client)) + '</div>' +
+            '<div class="row-sub" style="margin-top:2px;">' + statusBadge(t.status) +
+              (t.attachmentCount ? ' &#128206; ' + t.attachmentCount : '') +
+              ' <span style="color:#9ca3af;">' + formatTime(t.createdAt) + '</span>' +
+            '</div>' +
+          '</div>';
+        list.appendChild(row);
+      });
+
+      const page = ticketPage.page || 1;
+      const pages = Math.max(1, Math.ceil((ticketPage.total || 0) / (ticketPage.pageSize || 25)));
+      const pager = document.createElement('div');
+      pager.className = 'panel-head';
+      pager.innerHTML =
+        '<button onclick="loadTickets({ page: ' + (page - 1) + ' })"' + (page <= 1 ? ' disabled' : '') + '>&lsaquo; Prev</button>' +
+        '<span class="status" style="margin:auto;">Page ' + page + ' / ' + pages + ' · ' + (ticketPage.total || 0) + ' tickets</span>' +
+        '<button onclick="loadTickets({ page: ' + (page + 1) + ' })"' + (page >= pages ? ' disabled' : '') + '>Next &rsaquo;</button>';
+      list.appendChild(pager);
+    }
+
+    async function openTicket(id) {
+      currentTicketId = id;
+      renderTickets();
+      try {
+        const result = await api('/support/tickets/' + encodeURIComponent(id));
+        if (id === currentTicketId) renderTicketDetail(result.data);
+      } catch (e) {
+        document.getElementById('ticketDetail').innerHTML =
+          '<div class="empty" style="color:#dc2626;">' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    function renderTicketDetail(t) {
+      document.getElementById('ticketTitle').innerHTML = escapeHtml(t.ticketNo) + ' ' + statusBadge(t.status);
+      const events = t.events || [];
+      const partner = t.partner || {};
+      const eventTitle = (e) => e.title || (e.type === 'STATUS_CHANGED'
+        ? 'Status: ' + (TICKET_STATUS[e.fromStatus] || e.fromStatus) + ' → ' + (TICKET_STATUS[e.toStatus] || e.toStatus)
+        : TICKET_EVENT[e.type] || e.type);
+
+      document.getElementById('ticketDetail').innerHTML =
+        '<p><strong>Category:</strong> ' + escapeHtml(t.categoryLabel || t.category) + '</p>' +
+        '<p><strong>Partner:</strong> ' + escapeHtml(ticketPartner(t.partner)) +
+          (partner.arn ? ' · ARN ' + escapeHtml(partner.arn) : '') + '</p>' +
+        '<p><strong>Client:</strong> ' + escapeHtml(ticketClient(t.client)) +
+          (t.client && t.client.phone ? ' · ' + escapeHtml(t.client.phone) : '') + '</p>' +
+        '<p><strong>Raised:</strong> ' + formatTime(t.createdAt) + '</p>' +
+        (t.status === 'OPEN' && events.some((e) => e.type === 'REOPENED')
+          ? '<p><span class="pill st-OPEN">Reopened</span></p>' : '') +
+        (t.resolvedByRole === 'PARTNER' ? '<p class="status">Closed by partner</p>' : '') +
+        (t.reopenableUntil ? '<p class="status">Partner can reopen until ' + formatTime(t.reopenableUntil) + '</p>' : '') +
+        '<div class="desc">' + escapeHtml(t.description) + '</div>' +
+        ((t.attachments || []).length
+          ? '<div class="thumbs">' + t.attachments.map((a) => !a.url
+              ? '<span class="pill">' + escapeHtml(a.fileName) + '</span>'
+              : '<a href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener" title="' + escapeHtml(a.fileName) + '">' +
+                (String(a.mimeType).startsWith('image/')
+                  ? '<img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.fileName) + '" />'
+                  : escapeHtml(a.fileName)) + '</a>',
+            ).join('') + '</div>'
+          : '') +
+        '<h4>Timeline</h4>' +
+        events.map((e) =>
+          '<div class="event">' +
+            '<div class="row-name">' + escapeHtml(eventTitle(e)) + '</div>' +
+            '<div class="row-sub">' + (e.actorRole === 'SUPPORT' ? 'Support' : 'Partner') + ' · ' + formatTime(e.createdAt) + '</div>' +
+            (e.note ? '<div class="desc">' + escapeHtml(e.note) + '</div>' : '') +
+          '</div>',
+        ).join('') +
+        (t.status === 'RESOLVED' ? '' :
+          (t.status === 'OPEN'
+            ? '<h4>Start work</h4><input id="tkStartTitle" placeholder="Title (optional)" />' +
+              '<button class="primary" onclick="ticketAction(\'start\')">Start work</button>'
+            : '') +
+          '<h4>Post update</h4><input id="tkUpdateTitle" placeholder="Title (optional)" />' +
+          '<textarea id="tkUpdateNote" rows="3" placeholder="Note for the partner (required)"></textarea>' +
+          '<button onclick="ticketAction(\'update\')">Post update</button>' +
+          '<h4>Resolve</h4><textarea id="tkResolveNote" rows="3" placeholder="Resolution note (required)"></textarea>' +
+          '<button class="danger" onclick="ticketAction(\'resolve\')">Resolve</button>') +
+        '<div id="ticketError" class="err"></div>';
+    }
+
+    async function ticketAction(kind) {
+      const val = (id) => document.getElementById(id).value.trim();
+      const err = (msg) => { document.getElementById('ticketError').textContent = msg; };
+      const base = '/support/tickets/' + encodeURIComponent(currentTicketId);
+      let path = base + '/status';
+      let body;
+      if (kind === 'start') {
+        body = { status: 'IN_PROGRESS', title: val('tkStartTitle') || undefined };
+      } else if (kind === 'update') {
+        path = base + '/updates';
+        body = { title: val('tkUpdateTitle') || undefined, note: val('tkUpdateNote') };
+        if (!body.note) return err('Note is required.');
+      } else {
+        body = { status: 'RESOLVED', note: val('tkResolveNote') };
+        if (!body.note) return err('Resolution note is required.');
+        if (!confirm('Resolve this ticket? The partner can reopen it for 48 hours.')) return;
+      }
+      try {
+        const result = await api(path, { method: 'POST', body: JSON.stringify(body) });
+        renderTicketDetail(result.data);
+        loadTickets({ quiet: true });
+      } catch (e) {
+        err(e.message);
+      }
     }
 
     // --- Utils ---

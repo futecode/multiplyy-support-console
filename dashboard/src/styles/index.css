@@ -1,0 +1,19 @@
+/*
+ * Global stylesheet entry. Order matters: tokens first, responsive last.
+ * Add new rules to the file for that area; add a new page file under pages/
+ * and import it here, before responsive.css.
+ */
+@import './tokens.css';
+@import './components/buttons.css';
+@import './layout/shell.css';
+@import './layout/helpers.css';
+@import './components/panels.css';
+@import './components/tabs.css';
+@import './components/tables.css';
+@import './components/badges.css';
+@import './components/states.css';
+@import './pages/login.css';
+@import './pages/ticket-detail.css';
+@import './pages/dashboard.css';
+@import './pages/chat.css';
+@import './responsive.css';

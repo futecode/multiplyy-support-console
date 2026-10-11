@@ -1,0 +1,61 @@
+/* ==========================================================================
+   Activity feed (dashboard)
+   ========================================================================== */
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 16px 20px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+.feed-item {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+.feed-item:last-child {
+  padding-bottom: 0;
+}
+.feed-item::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 16px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.feed-item:last-child::before {
+  display: none;
+}
+.feed-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 0 3px var(--surface);
+}
+.actor-support .feed-dot {
+  background: var(--primary);
+}
+.feed-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.feed-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.feed-title {
+  color: var(--heading);
+  font-size: 13px;
+}

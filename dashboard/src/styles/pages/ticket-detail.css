@@ -1,0 +1,195 @@
+/* ==========================================================================
+   Ticket detail
+   ========================================================================== */
+.ticket-title {
+  font-size: 20px;
+  margin-top: 4px;
+}
+.description,
+.event-note,
+.feed-note {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.description {
+  margin-top: 6px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 12px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+.dl dt {
+  color: var(--muted);
+}
+.dl dd {
+  margin: 0;
+  min-width: 0;
+  word-break: break-word;
+  color: var(--heading);
+}
+.timeline {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+}
+.event {
+  position: relative;
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.event::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  bottom: -20px;
+  width: 2px;
+  background: var(--border);
+}
+.event:last-child::before {
+  display: none;
+}
+.event-node {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--subtle);
+}
+.event-type-created .event-node {
+  border-color: var(--navy);
+}
+.event-type-note .event-node {
+  border-color: var(--primary);
+}
+.event-type-status_changed .event-node {
+  border-color: var(--success);
+}
+.event-type-reopened .event-node {
+  border-color: var(--open-dot);
+}
+.event-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.event-head time {
+  margin-left: auto;
+}
+.actions .panel-body {
+  gap: 0;
+}
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.action:first-child {
+  padding-top: 0;
+}
+.action:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.action .row-gap input {
+  flex: 1;
+}
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  font-size: 13px;
+}
+.attachments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.attachment a {
+  display: block;
+  border-radius: var(--radius-sm);
+  transition: box-shadow var(--t);
+}
+.attachment a:hover {
+  text-decoration: none;
+  box-shadow: var(--shadow-2);
+}
+.thumb {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: block;
+  background: var(--surface-alt);
+}
+.file-tile {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.file-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+}
+.file-kind {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.file-tile[data-kind='PDF'] .file-kind {
+  background: var(--danger);
+}
+.file-tile[data-kind='Excel'] .file-kind {
+  background: var(--success);
+}
+.file-name {
+  font-weight: 500;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

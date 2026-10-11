@@ -1,0 +1,187 @@
+/* ==========================================================================
+   Login
+   ========================================================================== */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  background: var(--surface-alt);
+}
+.login-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 40px clamp(32px, 6vw, 80px);
+  background: linear-gradient(155deg, #172f73 0%, var(--navy) 45%, var(--primary) 100%);
+  color: #fff;
+}
+/* Soft glows for depth; purely decorative. */
+.login-hero::before,
+.login-hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.login-hero::before {
+  width: 520px;
+  height: 520px;
+  top: -180px;
+  right: -160px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.35), transparent 65%);
+}
+.login-hero::after {
+  width: 420px;
+  height: 420px;
+  bottom: -200px;
+  left: -140px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 65%);
+}
+.login-hero > * {
+  position: relative;
+}
+
+/* Brand lock-up: mark + name, top-left */
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.login-logo {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 24px -10px rgba(15, 23, 42, 0.55);
+}
+.login-logo img {
+  display: block;
+}
+.login-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.login-brand-name {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.login-brand-tag {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* The message: large headline, quiet supporting line */
+.login-message {
+  max-width: 460px;
+}
+.login-headline {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: clamp(30px, 3.4vw, 44px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+.login-highlight {
+  position: relative;
+  white-space: nowrap;
+  background: linear-gradient(90deg, #bfdbfe, #ffffff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.login-highlight::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.08em;
+  height: 0.12em;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa, rgba(255, 255, 255, 0.85));
+}
+.login-subline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+}
+.login-subline::before {
+  content: '';
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.login-foot {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.login-main {
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow-2);
+}
+.login-card h1 {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+.login-card .btn {
+  height: 40px;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--heading);
+}
+.field input {
+  height: 40px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.field .otp-input {
+  height: 54px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.5em;
+  text-align: center;
+  padding-left: calc(12px + 0.5em);
+  font-variant-numeric: tabular-nums;
+  color: var(--heading);
+}
+.field .otp-input::placeholder {
+  color: var(--border-strong);
+}
